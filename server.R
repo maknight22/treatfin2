@@ -1,7 +1,7 @@
 #treatfin
 
 library(shiny)
-library(rms)
+#library(rms)
 library(dplyr)
 library(shinyvalidate)
 library(shinyjs)
