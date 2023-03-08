@@ -111,7 +111,7 @@ shinyServer(function(input, output, session) {
     
     updateRadioGroupButtons(session, "gender", choices = c("Male", "Female"), selected = character(0))
     updateRadioGroupButtons(session, "upperlobe", choices = c("Yes", "No"),selected = character(0))
-    updateRadioGroupButtons(session, "group", choices = c("Pulmonary Nodule Clinic", "Thoracic Surgery Clinic"), selected = character(0))
+    updateRadioGroupButtons(session, "group", choices = c("Pulmonary Nodule Clinic", "Thoracic Surgery Clinic", "Other"), selected = character(0))
     
     
     output$result <- renderText({
