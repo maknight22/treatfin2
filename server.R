@@ -5,7 +5,6 @@ library(rms)
 library(dplyr)
 library(shinyvalidate)
 #library(shinyjs)
-library(shinydashboard)
 library(flexdashboard)
 
 
