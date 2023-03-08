@@ -86,35 +86,51 @@ shinyServer(function(input, output, session) {
   iv$add_rule("packs", sv_required(message = "Pack Years must be provided"))
   iv$add_rule("size", sv_required(message = "Lesion Size must be provided"))
   iv$add_rule("upperlobe", sv_required(message = "Upper Lobe status must be provided"))
+  iv$add_rule("group", sv_required(message = "Setting of evaluation must be provided"))
+  iv$add_rule("height", sv_optional())
+  iv$add_rule("weight", sv_optional())
+  iv$add_rule("height", ~ if(is.na(input$weight)) "Weight must be provided with height")
+  iv$add_rule("weight", ~ if(is.na(input$height)) "Height must be provided with height")
   
   observeEvent(input$resetAll,{
     
-    reset("age")
-    reset("bmi_new")
-    reset("packs")
-    reset("fev1")
-    reset("size")
-    
-    reset("gender")
-    reset("upperlobe")
-    reset("group")
-    
-    reset("spicul")
-    reset("prev_cancer")
-    reset("anysympt")
-    reset("petavid")
-    reset("growthcat")
+    updateNumericInput(session, "age", value = NA)
+    updateNumericInput(session, "height", value = NA)
+    updateNumericInput(session, "weight", value = NA)
+    updateNumericInput(session, "packs", value = NA)
+    updateNumericInput(session, "fev1", value = NA)
+    updateNumericInput(session, "size", value = NA)
     
     
+    updateRadioGroupButtons(session, "spicul", choices = c("Yes", "No", "Missing"), selected = "Missing")
+    updateRadioGroupButtons(session, "prev_cancer", choices = c("Yes", "No", "Missing"), selected = "Missing")
+    updateRadioGroupButtons(session, "anysympt", choices = c("Yes", "No", "Missing"), selected = "Missing")
+    updateRadioGroupButtons(session, "petavid", choices= c("Yes", "No", "Missing"), selected = "Missing")
+    updateRadioGroupButtons(session, "growthcat", choices = c("Growth Observed", "No Lesion Growth","Insufficient Data"), selected = "Insufficient Data")
+    
+    
+    updateRadioGroupButtons(session, "gender", choices = c("Male", "Female"), selected = character(0))
+    updateRadioGroupButtons(session, "upperlobe", choices = c("Yes", "No"),selected = character(0))
+    updateRadioGroupButtons(session, "group", choices = c("Pulmonary Nodule Clinic", "Thoracic Surgery Clinic"), selected = character(0))
+    
+    
+    output$result <- renderText({
+      
+    })
+
   })
   
   observeEvent(input$submit,{
     
     if(iv$is_valid()){
+      
+      iv$enable
       inputdata <- eventReactive(input$submit,{
         data <- data.frame(
           age = input$age,
-          bmi_new = input$bmi_new,
+          height = input$height,
+          weight = input$weight,
+          #bmi_new = input$bmi_new,
           gender = input$gender,
           packs = input$packs,
           size = input$size,
@@ -138,6 +154,14 @@ shinyServer(function(input, output, session) {
         pred.vars = sort(pred.vars)
         
         ## Growth variable - treat insufficient data as missing
+        
+        if(is.na(data$height)){
+          data1.bmi_new = NA
+          data$bmi_new = NA
+        } else{
+          data1.bmi_new = (data$weight / (data$height ^ 2)) * 703
+          data$bmi_new = data1.bmi_new
+        }
         
         if(data$growthcat=="Growth Observed"){
           data1.growthcat = 1
@@ -222,7 +246,7 @@ shinyServer(function(input, output, session) {
         ## Format numerical inputs if none given (still at 0 default value)
         
         data1.age = ifelse(data$age==0, NA, data$age)
-        data1.bmi_new = ifelse(data$bmi_new==0, NA, data$bmi_new)  
+        #data1.bmi_new = ifelse(data$bmi_new==0, NA, data$bmi_new)  
         data1.packs = ifelse(data$packs==0, NA, data$packs)  
         data1.size = ifelse(data$size==0, NA, data$size)  
         data1.fev1 = ifelse(data$fev1==0, NA, data$fev1)
@@ -279,7 +303,7 @@ shinyServer(function(input, output, session) {
       
       iv$enable()
       showNotification(
-        "Please correct the errors in the form and try again",
+        "Incomplete data has been provided. Please correct the errors in the form and try again.",
         id = "submit_message", type = "error"
       )
       
