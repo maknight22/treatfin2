@@ -3,12 +3,14 @@
 library(shiny)
 library(shinythemes)
 library(shinyWidgets)
+library(shinydashboard)
+library(flexdashboard)
 
 
 shinyUI(
   
   fluidPage(theme = shinytheme("flatly"),
-    shinyjs::useShinyjs(),
+    #shinyjs::useShinyjs(),
     # Application title
     titlePanel(
       windowTitle = "TREAT 2.0 Calculator",
@@ -54,8 +56,8 @@ shinyUI(
              
              actionButton("submit", "Submit", class = "btn-primary"),
              actionButton("resetAll", "Reset"),
-             h1("Probability of Malignancy: ", textOutput("result", inline = TRUE), align = "center")
-             
+             h1("Probability of Malignancy: ", textOutput("result", inline = TRUE), align = "center"),
+             gaugeOutput("gauge")
              )
              
       ),

@@ -4,7 +4,9 @@ library(shiny)
 library(rms)
 library(dplyr)
 library(shinyvalidate)
-library(shinyjs)
+#library(shinyjs)
+library(shinydashboard)
+library(flexdashboard)
 
 
 TREAT2.0_data_dir = "./Data"
@@ -145,157 +147,163 @@ shinyServer(function(input, output, session) {
         )
         data
       })
+      data = inputdata()
       
+      pred.vars = c("Age" = "age", "BMI" = "bmi_new", "Gender" = "gender", "Pack Years" = "packs", "Lesion Size (mm)" = "size", "Spiculated Lesion Edge" = "spicul", "Upper Lobe?" = "upperlobe", "Lesion Growth" = "growthcat", "Previous Cancer?" = "prev_cancer", "Predicted FEV" = "fev1", "Pre-Op Symptoms?" = "anysympt", "FDG-PET Avid?" = "petavid", "Setting of Evaluation" = "group")
+      pred.vars = sort(pred.vars)
+      
+      ## Growth variable - treat insufficient data as missing
+      
+      if(is.na(data$height)){
+        data1.bmi_new = NA
+        data$bmi_new = NA
+      } else{
+        data1.bmi_new = (data$weight / (data$height ^ 2)) * 703
+        data$bmi_new = data1.bmi_new
+      }
+      
+      if(data$growthcat=="Growth Observed"){
+        data1.growthcat = 1
+      } else if(data$growthcat=="No Lesion Growth"){
+        data1.growthcat = 0
+      } else{
+        data1.growthcat = NA
+      }
+      data1.growthcat = as.numeric(data1.growthcat)
+      data1.growthcat = factor(data1.growthcat, levels=c(0,1), 
+                               labels=c("No","Yes"))
+      
+      ## Format other categorical inputs
+      if(data$gender=="Male"){
+        data1.gender = 1
+      } else if(data$gender=="Female"){
+        data1.gender = 0
+      } else{
+        data1.gender = NA
+      }
+      data1.gender = factor(data1.gender, levels=c(0,1), 
+                            labels=c("F","M"))
+      
+      
+      if(data$spicul=="Yes"){
+        data1.spicul = 1
+      } else if(data$spicul=="No"){
+        data1.spicul = 0
+      } else{
+        data1.spicul = NA
+      }
+      
+      
+      if(data$upperlobe == "Yes"){
+        data1.upperlobe = 1
+      } else if(data$upperlobe == "No"){
+        data1.upperlobe = 0
+      } else{
+        data1.upperlobe = NA
+      }
+      
+      
+      if(data$prev_cancer == "Yes"){
+        data1.prev_cancer = 1
+      } else if(data$prev_cancer == "No"){
+        data1.prev_cancer = 0
+      } else{
+        data1.prev_cancer = NA
+      }
+      
+      
+      if(data$anysympt == "Yes"){
+        data1.anysympt = 1
+      } else if(data$anysympt == "No"){
+        data1.anysympt = 0
+      } else{
+        data1.anysympt = NA
+      }
+      
+      
+      if(data$petavid == "Yes"){
+        data1.petavid = 1
+      } else if(data$petavid == "No"){
+        data1.petavid = 0
+      } else{
+        data1.petavid = NA
+      }
+      
+      
+      if(data$group == "Pulmonary Nodule Clinic"){
+        data1.group = 1
+      } else if(data$group=="Thoracic Surgery Clinic"){
+        data1.group = 2
+      } else if(data$group=="Surgical Resection"){
+        data1.group = 3
+      } else{
+        data1.group = NA
+      }
+      data1.group = factor(data1.group, levels=c(1,2,3), 
+                           labels=c("Pulm","Thoracic","Surgery"))
+      
+      ## Format numerical inputs if none given (still at 0 default value)
+      
+      data1.age = ifelse(data$age==0, NA, data$age)
+      #data1.bmi_new = ifelse(data$bmi_new==0, NA, data$bmi_new)  
+      data1.packs = ifelse(data$packs==0, NA, data$packs)  
+      data1.size = ifelse(data$size==0, NA, data$size)  
+      data1.fev1 = ifelse(data$fev1==0, NA, data$fev1)
+      
+      ## Combine into single data frame
+      data1 = data.frame(
+        "age" = data1.age,
+        "bmi_new" = data1.bmi_new,
+        "gender" = data1.gender,
+        "packs" = data1.packs,
+        "size" = data1.size,
+        "spicul" = data1.spicul,
+        "upperlobe" = data1.upperlobe,
+        "growthcat" = data1.growthcat,
+        "prev_cancer" = data1.prev_cancer,
+        "fev1" = data1.fev1,
+        "anysympt" = data1.anysympt,
+        "petavid" = data1.petavid,
+        "group" = data1.group)
+      
+      
+      data1 = data1[pred.vars]  # re-order to match saved results
+      NtMiss.Vars = pred.vars[which(!is.na(data1))]
+      
+      PMKS_vars_tmp_idx = which(lengths(PMKS_vars) == length(NtMiss.Vars))
+      pattern = names(which(sapply( PMKS_vars_tmp_idx, function(j) length(setdiff(NtMiss.Vars, PMKS_vars[[j]])) ) == 0))
+      which_fit = which(names(PMKS_vars) == pattern)
+      
+      fit = get(load(file.path(TREAT2.0_data_dir, paste("PMKS_treat2.0_fits_trimmed/PMKS_treat2.0_fits_",rownames(MP[which_fit,]),"_trimmed.rds",sep=""))))
+      
+      data = data[,NtMiss.Vars]
+      
+      data1.processed = data_preprocess_VW_v3(data=cbind("y"=1,data1),y.name="y",vars=NtMiss.Vars)
+      data1.processed$y = NA
+      
+      expit = function(z){exp(z)/(1+exp(z))}
+      lev = qt(1-0.05/2, fit$df.residual)  # qnorm(1-0.05/2)
+      
+      pred.val = predict(fit, newdata=data1.processed, type="link", se.fit=TRUE)
+      
+      prob = expit(pred.val$fit)
+      prob.lowerbound = expit(pred.val$fit - lev*pred.val$se.fit)
+      prob.upperbound = expit(pred.val$fit + lev*pred.val$se.fit)
+
       output$result <- renderText({
-        
-        data = inputdata()
-        
-        pred.vars = c("Age" = "age", "BMI" = "bmi_new", "Gender" = "gender", "Pack Years" = "packs", "Lesion Size (mm)" = "size", "Spiculated Lesion Edge" = "spicul", "Upper Lobe?" = "upperlobe", "Lesion Growth" = "growthcat", "Previous Cancer?" = "prev_cancer", "Predicted FEV" = "fev1", "Pre-Op Symptoms?" = "anysympt", "FDG-PET Avid?" = "petavid", "Setting of Evaluation" = "group")
-        pred.vars = sort(pred.vars)
-        
-        ## Growth variable - treat insufficient data as missing
-        
-        if(is.na(data$height)){
-          data1.bmi_new = NA
-          data$bmi_new = NA
-        } else{
-          data1.bmi_new = (data$weight / (data$height ^ 2)) * 703
-          data$bmi_new = data1.bmi_new
-        }
-        
-        if(data$growthcat=="Growth Observed"){
-          data1.growthcat = 1
-        } else if(data$growthcat=="No Lesion Growth"){
-          data1.growthcat = 0
-        } else{
-          data1.growthcat = NA
-        }
-        data1.growthcat = as.numeric(data1.growthcat)
-        data1.growthcat = factor(data1.growthcat, levels=c(0,1), 
-                                 labels=c("No","Yes"))
-        
-        ## Format other categorical inputs
-        if(data$gender=="Male"){
-          data1.gender = 1
-        } else if(data$gender=="Female"){
-          data1.gender = 0
-        } else{
-          data1.gender = NA
-        }
-        data1.gender = factor(data1.gender, levels=c(0,1), 
-                              labels=c("F","M"))
-        
-
-        if(data$spicul=="Yes"){
-          data1.spicul = 1
-        } else if(data$spicul=="No"){
-          data1.spicul = 0
-        } else{
-          data1.spicul = NA
-        }
-        
-
-        if(data$upperlobe == "Yes"){
-          data1.upperlobe = 1
-        } else if(data$upperlobe == "No"){
-          data1.upperlobe = 0
-        } else{
-          data1.upperlobe = NA
-        }
-        
-
-        if(data$prev_cancer == "Yes"){
-          data1.prev_cancer = 1
-        } else if(data$prev_cancer == "No"){
-          data1.prev_cancer = 0
-        } else{
-          data1.prev_cancer = NA
-        }
-        
-
-        if(data$anysympt == "Yes"){
-          data1.anysympt = 1
-        } else if(data$anysympt == "No"){
-          data1.anysympt = 0
-        } else{
-          data1.anysympt = NA
-        }
-        
-
-        if(data$petavid == "Yes"){
-          data1.petavid = 1
-        } else if(data$petavid == "No"){
-          data1.petavid = 0
-        } else{
-          data1.petavid = NA
-        }
-        
-
-        if(data$group == "Pulmonary Nodule Clinic"){
-          data1.group = 1
-        } else if(data$group=="Thoracic Surgery Clinic"){
-          data1.group = 2
-        } else if(data$group=="Surgical Resection"){
-          data1.group = 3
-        } else{
-          data1.group = NA
-        }
-        data1.group = factor(data1.group, levels=c(1,2,3), 
-                             labels=c("Pulm","Thoracic","Surgery"))
-        
-        ## Format numerical inputs if none given (still at 0 default value)
-        
-        data1.age = ifelse(data$age==0, NA, data$age)
-        #data1.bmi_new = ifelse(data$bmi_new==0, NA, data$bmi_new)  
-        data1.packs = ifelse(data$packs==0, NA, data$packs)  
-        data1.size = ifelse(data$size==0, NA, data$size)  
-        data1.fev1 = ifelse(data$fev1==0, NA, data$fev1)
-        
-        ## Combine into single data frame
-        data1 = data.frame(
-          "age" = data1.age,
-          "bmi_new" = data1.bmi_new,
-          "gender" = data1.gender,
-          "packs" = data1.packs,
-          "size" = data1.size,
-          "spicul" = data1.spicul,
-          "upperlobe" = data1.upperlobe,
-          "growthcat" = data1.growthcat,
-          "prev_cancer" = data1.prev_cancer,
-          "fev1" = data1.fev1,
-          "anysympt" = data1.anysympt,
-          "petavid" = data1.petavid,
-          "group" = data1.group)
-        
-        
-        data1 = data1[pred.vars]  # re-order to match saved results
-        NtMiss.Vars = pred.vars[which(!is.na(data1))]
-        
-        PMKS_vars_tmp_idx = which(lengths(PMKS_vars) == length(NtMiss.Vars))
-        pattern = names(which(sapply( PMKS_vars_tmp_idx, function(j) length(setdiff(NtMiss.Vars, PMKS_vars[[j]])) ) == 0))
-        which_fit = which(names(PMKS_vars) == pattern)
-        
-        fit = get(load(file.path(TREAT2.0_data_dir, paste("PMKS_treat2.0_fits_trimmed/PMKS_treat2.0_fits_",rownames(MP[which_fit,]),"_trimmed.rds",sep=""))))
-        
-        data = data[,NtMiss.Vars]
-        
-        data1.processed = data_preprocess_VW_v3(data=cbind("y"=1,data1),y.name="y",vars=NtMiss.Vars)
-        data1.processed$y = NA
-        
-        expit = function(z){exp(z)/(1+exp(z))}
-        lev = qt(1-0.05/2, fit$df.residual)  # qnorm(1-0.05/2)
-        
-        pred.val = predict(fit, newdata=data1.processed, type="link", se.fit=TRUE)
-        
-        prob = expit(pred.val$fit)
-        prob.lowerbound = expit(pred.val$fit - lev*pred.val$se.fit)
-        prob.upperbound = expit(pred.val$fit + lev*pred.val$se.fit)
-        
-        
         #draw table
         resultText = paste0(round(prob*100, 1), "%")
         resultText
         
+      })
+      output$gauge = renderGauge({
+        gauge(as.numeric(prob*100), 
+              min = 0, 
+              max = 100,
+              symbol = "%",
+              sectors = gaugeSectors(success = c(0, 10), 
+                                     warning = c(10, 70),
+                                     danger = c(70, 100)))
       })
       
       
