@@ -118,6 +118,10 @@ shinyServer(function(input, output, session) {
     output$result <- renderText({
       
     })
+    
+    output$gauge = renderGauge({
+
+    })
 
   })
   
