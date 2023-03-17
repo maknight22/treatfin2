@@ -277,7 +277,7 @@ shinyServer(function(input, output, session) {
       pattern = names(which(sapply( PMKS_vars_tmp_idx, function(j) length(setdiff(NtMiss.Vars, PMKS_vars[[j]])) ) == 0))
       which_fit = which(names(PMKS_vars) == pattern)
       
-      fit = get(load(file.path(TREAT2.0_data_dir, paste("PMKS_treat2.0_fits_trimmed/PMKS_treat2.0_fits_",rownames(MP[which_fit,]),"_trimmed.rds",sep=""))))
+      fit = get(load(file.path(TREAT2.0_data_dir, paste("PMKS_treat2.0.sa.min_fits_trimmed/PMKS_treat2.0.sa.min_fits_fitcv5_",rownames(MP[which_fit,]),"_trimmed.rds",sep=""))))
       
       data = data[,NtMiss.Vars]
       
