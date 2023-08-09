@@ -77,7 +77,7 @@ data_preprocess_VW_v3 = function(data3, y.name, vars) {
     
   }
   
-  # View(data.frame(rbind(t(colnames(X)), t(names)))) # check function
+  # Viewinst(data.frame(rbind(t(colnames(X)), t(names)))) # check function
   
   data_return = data.frame(cbind(data3[,y.name], X))
   
@@ -447,7 +447,7 @@ shinyServer(function(input, output, session) {
       res.alt = data.frame(data1.alt, "prob.orig"=prob, "prob.new"=prob.alt, "diff"=diff.alt, "abs.diff"=abs(diff.alt), row.names=NULL)
       
       coef.cutoff = 7.773174
-      data1.processed = na.omit(data1.processed)
+      #data1.processed = na.omit(data1.processed)
       
       if(any(abs(fit$coefficients) > coef.cutoff)) {
         LGCOEF = TRUE
