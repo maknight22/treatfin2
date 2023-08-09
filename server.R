@@ -425,7 +425,6 @@ shinyServer(function(input, output, session) {
       data1.alt = data1.alt[,NtMiss.Vars]
       data1.alt = na.omit(data1.alt)
       
-      View(data1.alt)
       
       data1.alt.processed = data_preprocess_VW_v3(data=cbind("y"=1,data1.alt[1,]),y.name="y",vars=NtMiss.Vars)
       
