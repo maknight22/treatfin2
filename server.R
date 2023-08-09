@@ -13,14 +13,23 @@ MP = get(load(file=file.path(TREAT2.0_data_dir, "MP_matrix.rds")))
 PMKS_vars = get(load(file=file.path(TREAT2.0_data_dir, "PMKS_vars.rds")))
 
 
+Reorder_Interaction_Terms = function(names) {
+  for(i in 1:length(names)) {
+    if(length(grep(":", names[i], v=T))==1) {
+      names[i] = paste(sort(strsplit(names[i], ":")[[1]]), collapse=":")
+    }
+  }
+  return(names)
+}
+
+
 data_preprocess_VW_v3 = function(data3, y.name, vars) {
-  
   ## Make spline terms and interactions
-  packs_knots =   c("25%"=25, "50%"=40, "75%"=60) 
-  age_knots =     c("25%"=59, "50%"=66, "75%"=72) 
-  size_knots =    c("25%"=15, "50%"=22, "75%"=34) 
-  bmi_new_knots = c("25%"=23.5, "50%"=26.5, "75%"=30.7) 
-  fev1_knots =    c("25%"=63, "50%"=77, "75%"=89.5) 
+  packs_knots =   c("25%"=20, "50%"=40, "75%"=60)
+  age_knots =     c("25%"=59, "50%"=66, "75%"=72)
+  size_knots =    c("25%"=14, "50%"=20, "75%"=32)
+  bmi_new_knots = c("25%"=23.479312895, "50%"=26.5, "75%"=30.712934115)
+  fev1_knots =    c("25%"=63, "50%"=77, "75%"=89.5)
   
   model_form_rcs = vars
   model_form_rcs = gsub("packs", paste("rcs(packs,c(",paste(packs_knots,collapse=","),")",")",sep=""), model_form_rcs)
@@ -71,6 +80,7 @@ data_preprocess_VW_v3 = function(data3, y.name, vars) {
   # View(data.frame(rbind(t(colnames(X)), t(names)))) # check function
   
   data_return = data.frame(cbind(data3[,y.name], X))
+  
   colnames(data_return) = c(y.name, names)
   ########################
   
@@ -279,8 +289,7 @@ shinyServer(function(input, output, session) {
       
       fit = get(load(file.path(TREAT2.0_data_dir, paste("PMKS_treat2.0.sa.min_fits_trimmed/PMKS_treat2.0.sa.min_fits_fitcv5_",rownames(MP[which_fit,]),"_trimmed.rds",sep=""))))
       
-      data = data[,NtMiss.Vars]
-      
+      #data1 = data1[,NtMiss.Vars]
       data1.processed = data_preprocess_VW_v3(data=cbind("y"=1,data1),y.name="y",vars=NtMiss.Vars)
       data1.processed$y = NA
       
@@ -288,26 +297,290 @@ shinyServer(function(input, output, session) {
       lev = qt(1-0.05/2, fit$df.residual)  # qnorm(1-0.05/2)
       
       pred.val = predict(fit, newdata=data1.processed, type="link", se.fit=TRUE)
-      
       prob = expit(pred.val$fit)
-      prob.lowerbound = expit(pred.val$fit - lev*pred.val$se.fit)
-      prob.upperbound = expit(pred.val$fit + lev*pred.val$se.fit)
+      if(pred.val$fit>=700) {prob = 1}
+      
+      
+      data1.alt = dplyr::slice(data1, rep(1:n(), each=18))
+      data1.alt[,"Var"] = c(rep("age",2), "anysympt", rep("bmi_new",2), rep("fev1",2), "gender", "group", "growthcat", rep("packs",2), "petavid", "prev_cancer", rep("size",2), "spicul", "upperlobe")
+      
+      
+      age.incr = 5       # ! TO DO: final choice of value
+      bmi_new.incr = 5   # ! TO DO: final choice of value
+      fev1.incr = 10     # ! TO DO: final choice of value
+      packs.incr = 10    # ! TO DO: final choice of value
+      size.incr = 5      # ! TO DO: final choice of value
+      
+      
+      # age
+      idx = which(data1.alt[,"Var"]=="age")
+      if(!is.na(data1$age)) {
+        data1.alt[idx,"age"] = data1.alt[idx,"age"] + age.incr*c(1,-1)
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # anysympt
+      idx = which(data1.alt[,"Var"]=="anysympt")
+      if(!is.na(data1$anysympt)) {
+        if(data1$anysympt==1) {data1.alt[idx,"anysympt"]=0}
+        if(data1$anysympt==0) {data1.alt[idx,"anysympt"]=1}
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # bmi_new
+      idx = which(data1.alt[,"Var"]=="bmi_new")
+      if(!is.na(data1$bmi_new)) {
+        data1.alt[idx,"bmi_new"] = data1.alt[idx,"bmi_new"] + bmi_new.incr*c(1,-1)
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # fev1
+      idx = which(data1.alt[,"Var"]=="fev1")
+      if(!is.na(data1$fev1)) {
+        data1.alt[idx,"fev1"] = data1.alt[idx,"fev1"] + fev1.incr*c(1,-1)
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      idx = which(data1.alt[,"Var"]=="gender")
+      if(!is.na(data1$gender)) {
+        if(data1$gender=="M") {data1.alt[idx,"gender"]="F"}
+        if(data1$gender=="F") {data1.alt[idx,"gender"]="M"}
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      idx = which(data1.alt[,"Var"]=="group")
+      if(!is.na(data1$group)) {
+        if(data1$group=="Pulm") {data1.alt[idx,"group"]="Thoracic"}
+        if(data1$group=="Thoracic") {data1.alt[idx,"group"]="Pulm"}
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # growthcat
+      idx = which(data1.alt[,"Var"]=="growthcat")
+      if(!is.na(data1$growthcat)) {
+        if(data1$growthcat=="Yes") {data1.alt[idx,"growthcat"]="No"}
+        if(data1$growthcat=="No") {data1.alt[idx,"growthcat"]="Yes"}
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # packs
+      idx = which(data1.alt[,"Var"]=="packs")
+      if(!is.na(data1$packs)) {
+        data1.alt[idx,"packs"] = data1.alt[idx,"packs"] + packs.incr*c(1,-1)
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # petavid
+      idx = which(data1.alt[,"Var"]=="petavid")
+      if(!is.na(data1$petavid)) {
+        if(data1$petavid==1) {data1.alt[idx,"petavid"]=0}
+        if(data1$petavid==0) {data1.alt[idx,"petavid"]=1}
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # prev_cancer
+      idx = which(data1.alt[,"Var"]=="prev_cancer")
+      if(!is.na(data1$prev_cancer)) {
+        if(data1$prev_cancer==1) {data1.alt[idx,"prev_cancer"]=0}
+        if(data1$prev_cancer==0) {data1.alt[idx,"prev_cancer"]=1}
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # size
+      idx = which(data1.alt[,"Var"]=="size")
+      if(!is.na(data1$size)) {
+        data1.alt[idx,"size"] = data1.alt[idx,"size"] + size.incr*c(1,-1)
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # spicul
+      idx = which(data1.alt[,"Var"]=="spicul")
+      if(!is.na(data1$spicul)) {
+        if(data1$spicul==1) {data1.alt[idx,"spicul"]=0}
+        if(data1$spicul==0) {data1.alt[idx,"spicul"]=1}
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      # upperlobe
+      idx = which(data1.alt[,"Var"]=="upperlobe")
+      if(!is.na(data1$upperlobe)) {
+        if(data1$upperlobe==1) {data1.alt[idx,"upperlobe"]=0}
+        if(data1$upperlobe==0) {data1.alt[idx,"upperlobe"]=1}
+      } else {
+        data1.alt[idx,] = NA
+      }
+      
+      data1.alt = data1.alt[,NtMiss.Vars]
+      data1.alt = na.omit(data1.alt)
+      
+      View(data1.alt)
+      
+      data1.alt.processed = data_preprocess_VW_v3(data=cbind("y"=1,data1.alt[1,]),y.name="y",vars=NtMiss.Vars)
+      
+      
+      for (x in 2:nrow(data1.alt)){
+        data1.alt.pro = data_preprocess_VW_v3(data=cbind("y"=1,data1.alt[x,]),y.name="y",vars=NtMiss.Vars)
+        data1.alt.processed = rbind(data1.alt.processed, data1.alt.pro)
+      }
+      
+      data1.alt.processed$y = NA
 
-      output$result <- renderText({
-        #draw table
-        resultText = paste0(round(prob*100, 1), "%")
-        resultText
+      prob.alt = sapply(1:nrow(data1.alt.processed), function(i) {
+        logitp = predict(fit, newdata=data1.alt.processed[i,], type="link", se.fit=TRUE)$fit
+        p = expit(logitp)
+        if(logitp>=700) {p = 1}
+        return(p)
+      })
+      
+      diff.alt =  prob.alt - prob
+      res.alt = data.frame(data1.alt, "prob.orig"=prob, "prob.new"=prob.alt, "diff"=diff.alt, "abs.diff"=abs(diff.alt), row.names=NULL)
+      
+      coef.cutoff = 7.773174
+      data1.processed = na.omit(data1.processed)
+      
+      if(any(abs(fit$coefficients) > coef.cutoff)) {
+        LGCOEF = TRUE
+        which_lg = names(which(fit$coefficients > coef.cutoff))
+        colnames(data1.processed) = Reorder_Interaction_Terms(colnames(data1.processed))
+        x_lg = data1.processed[,which_lg]
         
-      })
-      output$gauge = renderGauge({
-        gauge(as.numeric(prob*100), 
-              min = 0, 
-              max = 100,
-              symbol = "%",
-              sectors = gaugeSectors(success = c(0, 10), 
-                                     warning = c(10, 70),
-                                     danger = c(70, 100)))
-      })
+        if(any(x_lg != 0)) {LGCOEF_USED = TRUE 
+        } else {LGCOEF_USED = FALSE}
+        
+      } else {
+        LGCOEF = FALSE; LGCOEF_USED = FALSE
+      }
+      
+      # warn.cutoff = 0.5
+      # block.cutoff = 0.8
+      
+      warn.cutoff = rep(NA, 13)
+      names(warn.cutoff) = pred.vars
+      
+      
+      warn.cutoff["age"] = 0.25           # ! TO DO: final choice of value
+      warn.cutoff["anysympt"] = 0.3      # ! TO DO: final choice of value  
+      warn.cutoff["bmi_new"] = 0.25       # ! TO DO: final choice of value
+      warn.cutoff["fev1"] = 0.25          # ! TO DO: final choice of value
+      warn.cutoff["gender"] = 0.25        # ! TO DO: final choice of value
+      warn.cutoff["group"] = 0.6         # ! TO DO: final choice of value
+      warn.cutoff["growthcat"] = 0.6     # ! TO DO: final choice of value
+      warn.cutoff["packs"] = 0.25         # ! TO DO: final choice of value
+      warn.cutoff["petavid"] = 0.3       # ! TO DO: final choice of value
+      warn.cutoff["prev_cancer"] = 0.25   # ! TO DO: final choice of value
+      warn.cutoff["size"] = 0.4          # ! TO DO: final choice of value
+      warn.cutoff["spicul"] = 0.3        # ! TO DO: final choice of value
+      warn.cutoff["upperlobe"] = 0.25     # ! TO DO: final choice of value
+      
+      block.cutoff = rep(NA, 13)
+      names(block.cutoff) = pred.vars
+      
+      block.cutoff["age"] = 0.4           # ! TO DO: final choice of value
+      block.cutoff["anysympt"] = 0.5      # ! TO DO: final choice of value
+      block.cutoff["bmi_new"] = 0.4       # ! TO DO: final choice of value
+      block.cutoff["fev1"] = 0.4          # ! TO DO: final choice of value
+      block.cutoff["gender"] = 0.4        # ! TO DO: final choice of value
+      block.cutoff["group"] = 0.75         # ! TO DO: final choice of value
+      block.cutoff["growthcat"] = 0.75     # ! TO DO: final choice of value
+      block.cutoff["packs"] = 0.4         # ! TO DO: final choice of value
+      block.cutoff["petavid"] = 0.5       # ! TO DO: final choice of value
+      block.cutoff["prev_cancer"] = 0.4   # ! TO DO: final choice of value
+      block.cutoff["size"] = 0.7          # ! TO DO: final choice of value
+      block.cutoff["spicul"] = 0.5        # ! TO DO: final choice of value
+      block.cutoff["upperlobe"] = 0.4     # ! TO DO: final choice of value
+      
+      
+      BLOCK.a = (LGCOEF_USED == TRUE)
+      
+      
+      # WARN.a = (any(res.alt$abs.diff>=warn.cutoff) == TRUE)
+      WARN.a = (any(res.alt$abs.diff >= warn.cutoff[res.alt$Var]) == TRUE)
+      
+      # BLOCK.b = (any(res.alt$abs.diff>=block.cutoff) == TRUE)
+      BLOCK.b = (any(res.alt$abs.diff >= block.cutoff[res.alt$Var]) == TRUE)
+      
+      which.WARN.a = res.alt$Var[which(res.alt$abs.diff >= warn.cutoff[res.alt$Var])]
+      which.BLOCK.b = res.alt$Var[which(res.alt$abs.diff >= block.cutoff[res.alt$Var])]
+      
+      
+      BLOCK.1 = (prob>=0.999)    # ! TO DO: final choice of value
+      BLOCK.0 = (prob<=0.001)    # ! TO DO: final choice of value
+      
+      if(BLOCK.1==TRUE){
+        output$result <- renderText({
+          #draw table
+          resultText = paste0("\n", "\n","Warning: No probability of cancer estimated due to insufficient data in the training population and possible model instability")
+          resultText
+          
+        })
+        output$gauge = renderGauge({})
+      } else if(BLOCK.0==TRUE){
+        output$result <- renderText({
+          #draw table
+          resultText = paste0("\n", "\n","Warning: No probability of cancer estimated due to insufficient data in the training population and possible model instability")
+          resultText
+        })
+        output$gauge = renderGauge({})
+      } else if(BLOCK.a==TRUE){
+        output$result <- renderText({
+          #draw table
+          resultText = paste0("\n", "\n","Warning: No probability of cancer estimated due to insufficient data in the training population and possible model instability")
+          resultText
+        })
+        output$gauge = renderGauge({})
+      } else if(BLOCK.b==TRUE){
+        output$result <- renderText({
+          #draw table
+          resultText = paste0("\n", "\n","Warning: No probability of cancer estimated due to insufficient data in the training population and possible model instability")
+          resultText
+        })
+        output$gauge = renderGauge({})
+      } else if(WARN.a==TRUE){
+        output$result <- renderText({
+          #draw table
+          resultText = paste0(round(prob*100, 1), "%", "\n", "Warning: Limited data in the training population may result in model instability or an inaccurate risk estimate. Defer to clinical judgement.")
+          resultText
+          
+        })
+        output$gauge = renderGauge({
+          gauge(as.numeric(prob*100), 
+                min = 0, 
+                max = 100,
+                symbol = "%",
+                sectors = gaugeSectors(success = c(0, 10), 
+                                       warning = c(10, 70),
+                                       danger = c(70, 100)))
+        })
+      } else{
+        output$result <- renderText({
+          #draw table
+          resultText = paste0(round(prob*100, 1), "%")
+          resultText
+          
+        })
+        output$gauge = renderGauge({
+          gauge(as.numeric(prob*100), 
+                min = 0, 
+                max = 100,
+                symbol = "%",
+                sectors = gaugeSectors(success = c(0, 10), 
+                                       warning = c(10, 70),
+                                       danger = c(70, 100)))
+        })
+      }
+
       
       
     } else {

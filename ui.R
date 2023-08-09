@@ -45,7 +45,7 @@ shinyUI(
              
              radioGroupButtons("gender", "Sex (Required)", justified = TRUE, choices = c("Male", "Female"), selected = character(0)),
              radioGroupButtons("upperlobe", "Upper Lobe? (Required)", justified = TRUE, choices = c("Yes", "No"),selected = character(0)),
-             radioGroupButtons("group", "Setting of Evaluation (Required)", justified = TRUE ,choices = c("Pulmonary Nodule Clinic", "Thoracic Surgery Clinic", "Other"), selected = character(0)),
+             radioGroupButtons("group", "Setting of Evaluation (Required)", justified = TRUE ,choices = c("Pulmonary Nodule Clinic", "Thoracic Surgery Clinic"), selected = character(0)),
             
              radioGroupButtons("spicul", "Spiculated Lesion Edge?", justified = TRUE, choices = c("Yes", "No", "Missing"), selected = "Missing"),
              radioGroupButtons("prev_cancer", "Previous Cancer?", justified = TRUE, choices = c("Yes", "No", "Missing"), selected = "Missing"),
